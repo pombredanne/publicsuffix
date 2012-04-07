@@ -8,6 +8,8 @@ The Public Suffix List (PSL) is a set of rules describing
 "effective top-level domains" and can be used to determine the registered
 domain for a given host name.
 
+This is our branch, with a few tweaks for speed. The original repo can be found here: https://github.com/jpwatts/publicsuffix
+
 Usage
 -----
 
