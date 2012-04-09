@@ -18,276 +18,162 @@
 
 EFFECTIVE_TLD_NAMES = 'http://mxr.mozilla.org/mozilla-central/source/netwerk/dns/effective_tld_names.dat?raw=1'
 
-
 def _normalize(s):
-    # Leading dots are optional; remove them.
-    if s.startswith('.'):
-        s = s[1:]
-    # Rules end at the first white space.
-    s = s.split()[0]
-    # Domains are case-insensitive.
-    s = s.lower()
-    # Only deal with Unicode.
-    s = s.decode('utf-8')
-    return s
+    from exceptions import UnicodeEncodeError
+    s = s.strip().strip('.').split()[0].lower()
+    try:
+        return s.decode('utf-8')
+    except UnicodeEncodeError, ex:
+        return s        
 
+class PrefixNode:
+    '''
+    An internal class, each prefix in the tree represents a part of a domain name. (e.g. '.com')
+    The naming is a little confusing, a PrefixTree is the data structure, but the nodes are
+    used to store the suffixes of partial domain names.
+    '''
 
-class Rule(object):
-    """A rule describing a public domain suffix.
+    #passing a rule lets you build on entire branch in one call
+    def __init__(self, prefix, rule=None):
+        if prefix is not None:
+            self.is_exception = prefix.startswith('!')
+            if self.is_exception:
+                prefix = prefix[1:]
+        self.prefix = prefix
+        self.children = dict()
+        if rule is not None:
+            self.add(rule)
 
-    >>> com = Rule('.com')
-    >>> com
-    Rule(u'com')
+    def __repr__(self):
+        return 'PrefixNode(\'%s\')' % (self.prefix,)
 
-    >>> com.match('.com')
-    True
+    def add(self, rule):
+        if len(rule) == 0:
+            return
+        prefix = rule[0]
+        if prefix.startswith('!') and '*' in self.children:
+            #if this is an exception to a wildcard it should be a child of that wildcard
+            self.children['*'].add(rule)
+            return
+        if prefix in self.children:
+            self.children[prefix].add(rule[1:])
+        else:
+           if prefix.startswith('!'):
+               prefix = prefix[1:]
+           self.children[prefix] = PrefixNode( prefix, rule= rule[1:] )
 
-    >>> jpn_com = Rule('jpn.com')
-    >>> jpn_com
-    Rule(u'jpn.com')
+    # when given a rule to match, splits the tuple into a matching section and the domain name
+    # e.g. match( ('com', 'example', 'www') ) -> ( ['.com'], 'example' )
+    # e.g. match( ('com', 'eff-tld', 'site') ) -> ( ['.eff-tld', '.com'], 'site' )
+    def match(self, rule):
+        #print ' %s is matching %s' % (self.prefix, rule)
+        if len(rule) == 0:
+            #when a tld is also a hostname
+            return ( [], [])
+        if self.prefix == '*':
+            return self._match_as_wildcard(rule)
+        prefix = rule[0]
+        if prefix not in self.children:
+            if '*' in self.children:
+                return self.children['*'].match(rule)
+            return ( [], prefix )
+        else:
+            match = self.children[prefix].match( rule[1:] )
+            child_matched = match[0]
+            child_matched.append('.' + prefix)
+            return ( child_matched, match[1] ) 
 
-    >>> jpn_com.match('.com')
-    False
+    def _match_as_wildcard(self, rule):
+        #print '  %s: matching %s as wildcard. My children are: %s' % (self.prefix, rule, self.children)
+        prefix = rule[0]
+        #if prefix matches no exception
+        if prefix not in self.children:
+            if len(rule) > 1:
+                return ( ['.' + prefix], rule[1])
+            return ( ['.' + prefix], None)
+        else:
+            return ( [], prefix)
 
-    >>> com.match('example.com')
-    True
+class PrefixTree(PrefixNode):
+    '''
+    Helper to provide a nicer interface for dealing with the tree
+    '''
+    #seq is a sequence of tuples representing rules
+    #of the form ('com'), ('uk', 'co'), etc.
+    def __init__(self, seq):
+        PrefixNode.__init__(self, None)
+        for rule in seq:
+            self.add(rule)	
 
-    >>> com.match('.net')
-    False
+    def __repr__(self):
+        return '<PrefixTree (%s children)>' % (len(self.children),)
 
-    >>> uk = Rule('*.uk')
-    >>> uk
-    Rule(u'*.uk')
+    def match(self, s):
+        rule = tuple(reversed(s.strip().split('.')))
+        match = PrefixNode.match(self, rule)
+        #print 'Tree matching %s, match was %s' % (s, match)
+        if len(match[0]) == 0:
+            return None
+        return (''.join(match[0]), match[1])
 
-    >>> uk.match('co.uk')
-    True
-
-    >>> uk.match('parliament.uk')
-    True
-
-    >>> uk.match('bbc.co.uk')
-    True
-
-    >>> uk.match('www.bbc.co.uk')
-    True
-
-    >>> parliament = Rule('!parliament.uk')
-    >>> parliament
-    Rule(u'!parliament.uk')
-
-    >>> parliament.is_exception
-    True
-
-    >>> parliament.match('co.uk')
-    False
-
-    >>> parliament.match('parliament.uk')
-    True
-
-    >>> parliament.match('www.parliament.uk')
-    True
-
-    >>> parliament.match('python.org')
-    False
-
-    """
-    def __init__(self, s):
-        self.is_exception = s.startswith('!')
-        if self.is_exception:
-            s = s[1:]
+    def domain(self, s):
+        if s is None:
+            return None
         s = _normalize(s)
-        self.labels = tuple(reversed(s.split('.')))
-        self.s = s
+        match = self.match(s)
+        try:
+            return match[1] + match[0]
+        except:
+            return None
 
-    def __repr__(self):
-        s = unicode(self)
-        return '%s(%r)' % (type(self).__name__, s)
+    def domain(self, s):
+        if s is None:
+            return None
+        s = _normalize(s)
+        match = self.match(s)
+        try:
+            return match[1] + match[0]
+        except:
+            return None
 
-    def __str__(self):
-        return unicode(self).encode('utf-8')
+def _tokenize(lines):
+    rules = []
+    for s in lines:
+        if s and not s.isspace() and not s.startswith('//'):
+            rule = tuple(reversed(_normalize(s).split('.')))
+            rules.append(rule)
 
-    def __unicode__(self):
-        return u'%s%s' % (self.is_exception and '!' or '', self.s)
+    return rules
 
-    def __cmp__(self, other):
-        # All else being equal, rules with more labels sort first.
-        if not cmp(self.is_exception, other.is_exception):
-            return -1 * cmp(len(self.labels), len(other.labels))
-        if self.is_exception:
-            return 0 if other.is_exception else -1
-        return 1 if other.is_exception else 0
+def _is_ip(address):
+  parts = address.split(".")
+  if len(parts) != 4:
+    return False
+  for item in parts:
+    if not item.isdigit() or not 0 <= int(item) <= 255:
+      return False
+  return True
 
-    def match(self, domain):
-        domain = _normalize(domain)
-        labels = tuple(reversed(domain.split('.')))
-        len_labels = len(labels)
+suffixtree = None
 
-        # A rule can't match a domain with fewer labels than itself.
-        if len(self.labels) > len_labels:
-            return False
+'''
+Call this first to initialize the suffix tree
+'''
+def init_suffix_tree(tld_file):
+    fp = open(tld_file)
+    suffix_lines = fp.readlines()
+    suffix_rules = _tokenize(suffix_lines)
+    fp.close()
+    global suffixtree
+    suffixtree = PrefixTree(suffix_rules)
 
-        for i in range(len_labels):
-            try:
-                r_label = self.labels[i]
-            except IndexError:
-                break
-            if r_label != '*' and labels[i] != r_label:
-                return False
-        return True
-
-
-class SuffixList(list):
-    """A list of rules for finding top-level domains.
-
-    >>> psl = public_suffix_list()
-
-    >>> psl.domain('www.example.com')
-    u'example.com'
-
-    >>> psl.tld('www.example.com')
-    u'com'
-
-    >>> psl.domain('example.com')
-    u'example.com'
-
-    >>> psl.tld('example.com')
-    u'com'
-
-    >>> psl.domain('.com') is None
-    True
-
-    >>> psl.tld('.com')
-    u'com'
-
-    >>> psl.domain('www.bbc.co.uk')
-    u'bbc.co.uk'
-
-    >>> psl.tld('www.bbc.co.uk')
-    u'co.uk'
-
-    >>> psl.domain('bbc.co.uk')
-    u'bbc.co.uk'
-
-    >>> psl.tld('bbc.co.uk')
-    u'co.uk'
-
-    >>> psl.domain('co.uk') is None
-    True
-
-    >>> psl.tld('co.uk')
-    u'co.uk'
-
-    >>> psl.domain('www.parliament.uk')
-    u'parliament.uk'
-
-    >>> psl.tld('www.parliament.uk')
-    u'uk'
-
-    >>> psl.domain('parliament.uk')
-    u'parliament.uk'
-
-    >>> psl.tld('parliament.uk')
-    u'uk'
-
-    >>> psl.parents('www.sub.domain.example.com')
-    [u'sub.domain.example.com', u'domain.example.com', u'example.com']
-
-    >>> psl.parent('www.sub.domain.example.com')
-    u'sub.domain.example.com'
-
-    >>> psl.parents('www.sub.domain.bbc.co.uk')
-    [u'sub.domain.bbc.co.uk', u'domain.bbc.co.uk', u'bbc.co.uk']
-
-    >>> psl.parent('www.sub.domain.bbc.co.uk')
-    u'sub.domain.bbc.co.uk'
-
-    >>> psl.parents('www.sub.domain.parliament.uk')
-    [u'sub.domain.parliament.uk', u'domain.parliament.uk', u'parliament.uk']
-
-    >>> psl.parent('www.sub.domain.parliament.uk')
-    u'sub.domain.parliament.uk'
-
-    >>> psl.parent('www.example.com')
-    u'example.com'
-
-    >>> psl.parent('example.com') is None
-    True
-
-    """
-    def __init__(self, seq=None):
-        super(SuffixList, self).__init__()
-        if seq is not None:
-            self += seq
-
-    def __add__(self, seq):
-        seq = [Rule(s) for s in seq if s and not s.startswith('//')]
-        return type(self)(super(SuffixList, self).__add__(seq))
-
-    def __iadd__(self, seq):
-        for s in seq:
-            self.append(s)
-
-    def __repr__(self):
-        return '%s(%s)' % (type(self).__name__, super(SuffixList, self).__repr__())
-
-    def append(self, s):
-        self.insert(len(self), s)
-
-    def insert(self, i, s):
-        if s and not s.startswith('//'):
-            super(SuffixList, self).insert(i, Rule(s))
-
-    def domain(self, host):
-        """Return the registered domain name for a given host name."""
-        host = _normalize(host)
-        tld = self.tld(host)
-        if host != tld:
-            return u'%s.%s' % (host[:-len(tld)-1].rsplit('.', 1)[-1], tld)
-
-    def iter_parents(self, host):
-        """Iterate over a host's parents, stopping at the registered domain."""
-        host = _normalize(host)
-        domain = self.domain(host)
-        if host != domain:
-            parent = host.split('.', 1)[1]
-            while parent != domain:
-                yield parent
-                parent = parent.split('.', 1)[1]
-            yield domain
-
-    def parent(self, host):
-        """Return a host's parent."""
-        for parent in self.iter_parents(host):
-            return parent
-
-    def parents(self, host):
-        """Return a list of a host's parents, ordered by specificity."""
-        return list(self.iter_parents(host))
-
-    def tld(self, host):
-        """Return the top-level domain for a given host name."""
-        host = _normalize(host)
-        matches = sorted(r for r in self if r.match(host))
-        if matches:
-            rule = matches[0]
-            len_rule_labels = len(rule.labels)
-            if rule.is_exception:
-                maxsplit = len_rule_labels - 1
-            elif len(host.split('.')) == len_rule_labels:
-                return host
-            else:
-                maxsplit = len_rule_labels
-            return u'.'.join(host.rsplit('.', maxsplit)[1:])
-        return host.rsplit('.', 1)[-1]
-
-
-def public_suffix_list(url=EFFECTIVE_TLD_NAMES, headers=None, http=None):
-    if http is None:
-        import httplib2
-        http = httplib2.Http()
-    _response, content = http.request(url, headers=headers)
-    return SuffixList(content.splitlines())
-
+def get_root_domain(domain):
+    if not domain:
+      return None
+    domain = _normalize(domain)
+    if _is_ip(domain):
+      return domain
+    return suffixtree.domain(domain)
 
 if __name__ == '__main__':
     import doctest
