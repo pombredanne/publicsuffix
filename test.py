@@ -68,3 +68,4 @@ if __name__ == "__main__":
     test('test.k12.ak.us', 'test.k12.ak.us')
     test('www.test.k12.ak.us', 'test.k12.ak.us')
 
+    test(u'\U0001f4a9.com',u'\U0001f4a9.com')
