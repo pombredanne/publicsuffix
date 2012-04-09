@@ -1,5 +1,5 @@
 ============
-publicsuffix
+fastpublicsuffix
 ============
 
 This module provides a Python interface to the `Public Suffix List`_.
@@ -8,7 +8,7 @@ The Public Suffix List (PSL) is a set of rules describing
 "effective top-level domains" and can be used to determine the registered
 domain for a given host name.
 
-This branch is maintained by mixrank.com, we reimplemented it using a different data structure (a prefix tree)
+This branch is maintained by `MixRank`_, we reimplemented it using a different data structure (a prefix tree)
 in order to improve performance.
 
 Usage
@@ -27,4 +27,5 @@ Find the registered domain::
     u'python.org'
 
 .. _`Public Suffix List`: http://publicsuffix.org/
-.. _`list`: 'http://mxr.mozilla.org/mozilla-central/source/netwerk/dns/effective_tld_names.dat?raw=1'
+.. _`list`: http://mxr.mozilla.org/mozilla-central/source/netwerk/dns/effective_tld_names.dat?raw=1
+.. _`MixRank`: http://mixrank.com
