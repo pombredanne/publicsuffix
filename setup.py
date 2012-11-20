@@ -7,7 +7,7 @@ setup(
     description='Fast Python interface to the Public Suffix List',
     author='Richard Boulton',
     author_email='richard@tartarus.org',
-    url='https://github.com/rboulton/publicsuffix',
+    url='https://github.com/rboulton/fastpublicsuffix',
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
