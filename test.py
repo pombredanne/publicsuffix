@@ -11,7 +11,8 @@ if __name__ == "__main__":
 
     init_suffix_tree('names.dat')
 
-    #tests are from http://publicsuffix.org/list/test.txt
+    # The first set of tests here are derived from
+    # http://publicsuffix.org/list/test.txt
     test(None, None)
     test('COM', None)
     test('WwW.example.COM', 'example.com')
@@ -45,9 +46,15 @@ if __name__ == "__main__":
     test('test.ac.jp', 'test.ac.jp')
     test('www.test.ac.jp', 'test.ac.jp')
     test('kyoto.jp', None)
-    test('c.kyoto.jp', None)
-    test('b.c.kyoto.jp', 'b.c.kyoto.jp')
-    test('a.b.c.kyoto.jp', 'b.c.kyoto.jp')
+    # The following 3 tests are changed from those at
+    # http://publicsuffix.org/list/test.txt, due to changes in the list on 4th
+    # July 2012: http://hg.mozilla.org/mozilla-central/rev/290afd57d2a8
+    # The 2 tests following these are added to further test this update.
+    test('c.kyoto.jp', 'c.kyoto.jp')
+    test('b.c.kyoto.jp', 'c.kyoto.jp')
+    test('a.b.c.kyoto.jp', 'c.kyoto.jp')
+    test('muko.kyoto.jp', None)
+    test('foo.muko.kyoto.jp', 'foo.muko.kyoto.jp')
     test('pref.kyoto.jp', 'pref.kyoto.jp')
     test('www.pref.kyoto.jp', 'pref.kyoto.jp')
 
@@ -68,4 +75,33 @@ if __name__ == "__main__":
     test('test.k12.ak.us', 'test.k12.ak.us')
     test('www.test.k12.ak.us', 'test.k12.ak.us')
 
+    # End of tests derived from http://publicsuffix.org/list/test.txt
+
+    # Test a unicode domain.
     test(u'\U0001f4a9.com',u'\U0001f4a9.com')
+
+    # Test that a completely unknown domain is not passed
+    test('randomhost', None)
+
+    # Test handling of domains reserved by RFC2606
+    test('test', None)
+    test('.test', None)
+    test('foo.test', None)
+    test('example', None)
+    test('.example', None)
+    test('foo.example', None)
+    test('invalid', None)
+    test('.invalid', None)
+    test('foo.invalid', None)
+    test('localhost', None)
+    test('.localhost', None)
+    test('foo.localhost', None)
+
+    # Test some uk domains.
+    test('bl.uk', 'bl.uk')
+    test('www.bl.uk', 'bl.uk')
+    test('co.uk', None)
+    test('foo.co.uk', 'foo.co.uk')
+    test('www.foo.co.uk', 'foo.co.uk')
+    test('gov.uk', None)
+    test('www.gov.uk', 'www.gov.uk')
