@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 
 # Copyright 2010 Watts Lab, Inc.
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,13 +18,14 @@
 
 EFFECTIVE_TLD_NAMES = 'http://mxr.mozilla.org/mozilla-central/source/netwerk/dns/effective_tld_names.dat?raw=1'
 
+
 def _normalize(s):
-    from exceptions import UnicodeEncodeError
     s = s.strip().strip('.').split()[0].lower()
     try:
         return s.decode('utf-8')
     except UnicodeEncodeError, ex:
-        return s        
+        return s
+
 
 class PrefixNode:
     '''
@@ -58,30 +59,38 @@ class PrefixNode:
         if prefix in self.children:
             self.children[prefix].add(rule[1:])
         else:
-           if prefix.startswith('!'):
-               prefix = prefix[1:]
-           self.children[prefix] = PrefixNode( prefix, rule= rule[1:] )
+            if prefix.startswith('!'):
+                prefix = prefix[1:]
+            self.children[prefix] = PrefixNode(prefix, rule=rule[1:])
 
-    # when given a rule to match, splits the tuple into a matching section and the domain name
-    # e.g. match( ('com', 'example', 'www') ) -> ( ['.com'], 'example' )
-    # e.g. match( ('com', 'eff-tld', 'site') ) -> ( ['.eff-tld', '.com'], 'site' )
     def match(self, rule):
+        """Given a rule, splits the tuple into a matching section and domain.
+
+        >>> node = PrefixNode('', ['com'])
+        >>> node.match( ('com', 'example', 'www') )
+        (['.com'], 'example')
+
+        >>> node = PrefixNode('', ['uk', '*'])
+        >>> node.match( ('uk', 'co', 'foo') )
+        (['.co', '.uk'], 'foo')
+
+        """
         #print ' %s is matching %s' % (self.prefix, rule)
         if len(rule) == 0:
             #when a tld is also a hostname
-            return ( [], [])
+            return ([], [])
         if self.prefix == '*':
             return self._match_as_wildcard(rule)
         prefix = rule[0]
         if prefix not in self.children:
             if '*' in self.children:
                 return self.children['*'].match(rule)
-            return ( [], prefix )
+            return ([], prefix)
         else:
-            match = self.children[prefix].match( rule[1:] )
+            match = self.children[prefix].match(rule[1:])
             child_matched = match[0]
             child_matched.append('.' + prefix)
-            return ( child_matched, match[1] ) 
+            return (child_matched, match[1])
 
     def _match_as_wildcard(self, rule):
         #print '  %s: matching %s as wildcard. My children are: %s' % (self.prefix, rule, self.children)
@@ -89,21 +98,27 @@ class PrefixNode:
         #if prefix matches no exception
         if prefix not in self.children:
             if len(rule) > 1:
-                return ( ['.' + prefix], rule[1])
-            return ( ['.' + prefix], None)
+                return (['.' + prefix], rule[1])
+            return (['.' + prefix], None)
         else:
-            return ( [], prefix)
+            return ([], prefix)
+
 
 class PrefixTree(PrefixNode):
-    '''
-    Helper to provide a nicer interface for dealing with the tree
-    '''
-    #seq is a sequence of tuples representing rules
-    #of the form ('com'), ('uk', 'co'), etc.
+    """Helper to provide a nicer interface for dealing with the tree.
+
+    """
+
     def __init__(self, seq):
+        """Create from a sequence of rules.
+
+        @param seq is a sequence of tuples representing rules of the form
+        ('com'), ('uk', 'co'), etc.
+
+        """
         PrefixNode.__init__(self, None)
         for rule in seq:
-            self.add(rule)	
+            self.add(rule)
 
     def __repr__(self):
         return '<PrefixTree (%s children)>' % (len(self.children),)
@@ -121,20 +136,10 @@ class PrefixTree(PrefixNode):
             return None
         s = _normalize(s)
         match = self.match(s)
-        try:
-            return match[1] + match[0]
-        except:
+        if match is None:
             return None
+        return match[1] + match[0]
 
-    def domain(self, s):
-        if s is None:
-            return None
-        s = _normalize(s)
-        match = self.match(s)
-        try:
-            return match[1] + match[0]
-        except:
-            return None
 
 def _tokenize(lines):
     rules = []
@@ -142,24 +147,24 @@ def _tokenize(lines):
         if s and not s.isspace() and not s.startswith('//'):
             rule = tuple(reversed(_normalize(s).split('.')))
             rules.append(rule)
-
     return rules
 
+
 def _is_ip(address):
-  parts = address.split(".")
-  if len(parts) != 4:
-    return False
-  for item in parts:
-    if not item.isdigit() or not 0 <= int(item) <= 255:
-      return False
-  return True
+    parts = address.split(".")
+    if len(parts) != 4:
+        return False
+    for item in parts:
+        if not item.isdigit() or not 0 <= int(item) <= 255:
+            return False
+    return True
+
 
 suffixtree = None
 
-'''
-Call this first to initialize the suffix tree
-'''
+
 def init_suffix_tree(tld_file):
+    """Call this first to initialize the suffix tree"""
     fp = open(tld_file)
     suffix_lines = fp.readlines()
     suffix_rules = _tokenize(suffix_lines)
@@ -167,13 +172,15 @@ def init_suffix_tree(tld_file):
     global suffixtree
     suffixtree = PrefixTree(suffix_rules)
 
+
 def get_root_domain(domain):
     if not domain:
-      return None
+        return None
     domain = _normalize(domain)
     if _is_ip(domain):
-      return domain
+        return domain
     return suffixtree.domain(domain)
+
 
 if __name__ == '__main__':
     import doctest
