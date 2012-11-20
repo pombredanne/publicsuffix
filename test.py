@@ -1,4 +1,4 @@
-from publicsuffix import init_suffix_tree, get_root_domain
+from fastpublicsuffix import init_suffix_tree, get_root_domain
 
 def test(domain, expected):
     result = get_root_domain(domain)
@@ -9,7 +9,7 @@ def test(domain, expected):
 
 if __name__ == "__main__":
 
-    init_suffix_tree('names.dat')
+    init_suffix_tree()
 
     # The first set of tests here are derived from
     # http://publicsuffix.org/list/test.txt

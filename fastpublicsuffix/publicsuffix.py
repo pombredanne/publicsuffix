@@ -16,6 +16,9 @@
 # limitations under the License.
 
 
+import os.path
+
+
 EFFECTIVE_TLD_NAMES = 'http://mxr.mozilla.org/mozilla-central/source/netwerk/dns/effective_tld_names.dat?raw=1'
 
 
@@ -163,8 +166,10 @@ def _is_ip(address):
 suffixtree = None
 
 
-def init_suffix_tree(tld_file):
+def init_suffix_tree(tld_file=None):
     """Call this first to initialize the suffix tree"""
+    if tld_file is None:
+        tld_file = os.path.join(os.path.dirname(__file__), 'public_suffix_list.txt')
     fp = open(tld_file)
     suffix_lines = fp.readlines()
     suffix_rules = _tokenize(suffix_lines)
