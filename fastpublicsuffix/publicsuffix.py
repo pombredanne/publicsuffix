@@ -139,7 +139,7 @@ class PrefixTree(PrefixNode):
             return None
         s = _normalize(s)
         match = self.match(s)
-        if match is None:
+        if match is None or not match[1]:
             return None
         return match[1] + match[0]
 
