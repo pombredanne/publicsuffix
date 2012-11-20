@@ -2,12 +2,12 @@ from distutils.core import setup
 
 
 setup(
-    name='publicsuffix',
+    name='fastpublicsuffix',
     version='0.1',
     description='Fast Python interface to the Public Suffix List',
-    author='Brian Cloutier',
-    author_email='brian@mixrank.com',
-    url='https://github.com/onlinemediagroup/publicsuffix',
+    author='Richard Boulton',
+    author_email='richard@tartarus.org',
+    url='https://github.com/rboulton/publicsuffix',
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
@@ -15,5 +15,7 @@ setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python',
     ],
-    py_modules=['publicsuffix'],
+    packages=['fastpublicsuffix'],
+    package_dir={'fastpublicsuffix': 'fastpublicsuffix'},
+    package_data={'fastpublicsuffix': ['public_suffix_list.txt']},
 )
