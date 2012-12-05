@@ -23,10 +23,13 @@ EFFECTIVE_TLD_NAMES = 'http://mxr.mozilla.org/mozilla-central/source/netwerk/dns
 
 
 def _normalize(s):
-    s = s.strip().strip('.').split()[0].lower()
+    s = s.strip().strip('.').split()
+    if len(s) ==0:
+        return ''
+    s = s[0].lower()
     try:
         return s.decode('utf-8')
-    except UnicodeEncodeError, ex:
+    except UnicodeEncodeError:
         return s
 
 
