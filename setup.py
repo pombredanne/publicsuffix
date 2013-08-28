@@ -3,7 +3,7 @@ from distutils.core import setup
 
 setup(
     name='fastpublicsuffix',
-    version='0.2',
+    version='0.3',
     description='Fast Python interface to the Public Suffix List',
     author='Richard Boulton',
     author_email='richard@tartarus.org',
