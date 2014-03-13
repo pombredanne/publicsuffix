@@ -1,0 +1,14 @@
+language: python
+
+python:
+  - 2.7
+  - pypy
+
+install: python setup.py install
+
+before_script:
+  - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then 2to3 fastpublicsuffix -w; 2to3 test.py -w; fi
+  - pip install --use-mirrors pytest pytest-timeout
+
+script:
+  - py.test -v test.py
